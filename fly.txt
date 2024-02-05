@@ -1,0 +1,83 @@
+local player = game.Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hum = char:WaitForChild("Humanoid")
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+local controlModule = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"):WaitForChild("ControlModule"))
+local UIS = game:GetService("UserInputService")
+
+local camera = workspace.CurrentCamera
+
+local flightforce = Instance.new("BodyVelocity")
+flightforce.MaxForce = Vector3.new(1, 1, 1) * 10^6
+flightforce.P = 10^6
+
+local flightGryo = Instance.new("BodyGyro")
+flightGryo.MaxTorque = Vector3.new(1, 1, 1) * 10^6
+flightGryo.P = 10^6
+
+local flying = false
+local isjumping = false
+
+local function stateChange(old, new)
+	if new == Enum.HumanoidStateType.Jumping or new == Enum.HumanoidStateType.FallingDown or new == Enum.HumanoidStateType.Freefall then
+		isjumping = true
+	elseif new == Enum.HumanoidStateType.Landed then
+		isjumping = false
+	end
+end
+
+local function ToggleFlight()
+	if not isjumping or hum:GetState() ~= Enum.HumanoidStateType.Freefall then return end
+	flying = not flying
+	
+	flightGryo.Parent = flying and hrp or nil
+	flightforce.Parent = flying and hrp or nil
+	flightGryo.CFrame = hrp.CFrame
+	flightforce.Velocity = Vector3.new()
+	
+	char.Animate.Disabled = flying
+	
+	if flying then
+		while flying do
+			
+			local movevector = controlModule:GetMoveVector()
+			
+			local direction = camera.CFrame.RightVector * (movevector.X) + camera.CFrame.LookVector * (movevector.Z * -1)
+			
+			if direction:Dot(direction) > 0 then
+				direction = direction.Unit
+			end
+			
+			flightGryo.CFrame = camera.CFrame
+			flightforce.Velocity = direction * 100
+			
+			if hum.MoveDirection ~= Vector3.new() then
+				-- Animations
+			end
+			wait()
+		end
+	end
+end
+
+UIS.InputBegan:Connect(function(key, processed)
+	if not processed then
+		if key.KeyCode == Enum.KeyCode.Space then
+			ToggleFlight()
+		end
+	end
+end)
+
+local jumpButton
+
+if UIS.TouchEnabled then
+	pcall(function()
+		jumpButton = player:WaitForChild("PlayerGui"):WaitForChild("TouchGui"):WaitForChild("TouchControlFrame"):WaitForChild("JumpButton")
+	end)
+end
+
+if jumpButton ~= nil then
+	jumpButton.MouseButton1Down:Connect(ToggleFlight)
+end
+
+hum.StateChanged:Connect(stateChange)
